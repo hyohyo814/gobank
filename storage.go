@@ -69,7 +69,7 @@ func (s *PostgresStore) CreateAccount(acc *Account) error {
 		return err
 	}
 
-	fmt.Printf("%+v", res)
+	fmt.Printf("%+v\n", res)
 
 	return nil
 }
