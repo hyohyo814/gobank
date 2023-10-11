@@ -153,13 +153,21 @@ func withJWTAuth(handlerFunc http.HandlerFunc) http.HandlerFunc {
 		fmt.Println("calling JWT auth middleware")
 
 		tokenString := r.Header.Get("x-jwt-token")
+		token, err := validateJWT(tokenString)
 
-		_, err := validateJWT(tokenString)
-
-		if err != nil {
+		if err != nil || !token.Valid {
 			WriteJSON(w, http.StatusForbidden, APIError{Error: "invalid token"})
 			return
 		}
+
+		userID, err := getQueryID(r)
+		if err != nil {
+			WriteJSON(w, http.StatusNotFound, APIError{Error: "invalid query"})
+		}
+		fmt.Println(userID)
+
+		claims := token.Claims.(jwt.MapClaims)
+		fmt.Println("claims: ", claims)
 
 		handlerFunc(w, r)
 	}
