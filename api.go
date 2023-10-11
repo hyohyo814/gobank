@@ -53,8 +53,8 @@ func (s *APIServer) handleGetAccount(w http.ResponseWriter, r *http.Request) err
 	if err != nil {
 		return err
 	}
-			
-	return WriteJSON(w, http.StatusOK, accounts) 
+
+	return WriteJSON(w, http.StatusOK, accounts)
 }
 
 func (s *APIServer) handleGetAccountByID(w http.ResponseWriter, r *http.Request) error {
@@ -88,7 +88,7 @@ func (s *APIServer) handleCreateAccount(w http.ResponseWriter, r *http.Request) 
 		return err
 	}
 
-	account := NewAccount(createAccountReq.FirstName, createAccountReq.LastName) 
+	account := NewAccount(createAccountReq.FirstName, createAccountReq.LastName)
 	if err := s.store.CreateAccount(account); err != nil {
 		return err
 	}
@@ -140,7 +140,7 @@ func withJWTAuth(handlerFunc http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		handlerFunc(w, r)	
+		handlerFunc(w, r)
 	}
 }
 
@@ -151,8 +151,8 @@ func validateJWT(tokenString string) (*jwt.Token, error) {
 			return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
 		}
 
-		return []byte(secret), nil 
-	})	
+		return []byte(secret), nil
+	})
 }
 
 type apiFunc func(http.ResponseWriter, *http.Request) error
