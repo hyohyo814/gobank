@@ -7,10 +7,10 @@ import (
 	"net/http"
 	"os"
 	"strconv"
-	"time"
 
 	jwt "github.com/golang-jwt/jwt/v4"
 	"github.com/gorilla/mux"
+	"github.com/joho/godotenv"
 )
 
 type APIServer struct {
@@ -29,7 +29,7 @@ func (s *APIServer) Run() {
 	router := mux.NewRouter()
 
 	router.HandleFunc("/account", makeHTTPHandleFunc(s.handleAccount))
-	router.HandleFunc("/account/{id}", withJWTAuth(makeHTTPHandleFunc(s.handleGetAccountByID)))
+	router.HandleFunc("/account/{id}", withJWTAuth(makeHTTPHandleFunc(s.handleGetAccountByID), s.store))
 	router.HandleFunc("/transfer", makeHTTPHandleFunc(s.handleTransfer))
 
 	log.Println("JSON API server running on port: ", s.listenAddr)
@@ -96,7 +96,7 @@ func (s *APIServer) handleCreateAccount(w http.ResponseWriter, r *http.Request) 
 
 	tokenString, err := createJWT(account)
 	if err != nil {
-		return nil
+		return err 
 	}
 
 	fmt.Println("JWT token: ", tokenString)
@@ -137,44 +137,56 @@ func WriteJSON(w http.ResponseWriter, status int, v any) error {
 
 func createJWT(acc *Account) (string, error) {
 	claims := &jwt.MapClaims{
-		"expiresAt":     jwt.NewNumericDate(time.Unix(1516239022, 0)),
+		"expiresAt":     15000,
 		"accountNumber": acc.Number,
 	}
 
-	secret := os.Getenv("JWT_SECRET")
+	secret := readSecret("JWT_SECRET")
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
 	return token.SignedString([]byte(secret))
 }
 
-func withJWTAuth(handlerFunc http.HandlerFunc) http.HandlerFunc {
+func permDen(w http.ResponseWriter) {
+	WriteJSON(w, http.StatusForbidden, APIError{Error: "permission denied"})
+}
 
+func withJWTAuth(handlerFunc http.HandlerFunc, s Storage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("calling JWT auth middleware")
 
 		tokenString := r.Header.Get("x-jwt-token")
 		token, err := validateJWT(tokenString)
-
 		if err != nil || !token.Valid {
-			WriteJSON(w, http.StatusForbidden, APIError{Error: "invalid token"})
+			permDen(w)
 			return
 		}
 
 		userID, err := getQueryID(r)
 		if err != nil {
-			WriteJSON(w, http.StatusNotFound, APIError{Error: "invalid query"})
+			permDen(w)
+			return
 		}
-		fmt.Println(userID)
+
+		acc, err := s.GetAccountByID(userID)
+		if err != nil {
+			permDen(w)
+			return
+		}
 
 		claims := token.Claims.(jwt.MapClaims)
-		fmt.Println("claims: ", claims)
+		fmt.Println(claims)
+		if float64(acc.Number) != claims["accountNumber"] {
+			permDen(w)
+			return
+		}
 
 		handlerFunc(w, r)
 	}
 }
 
 func validateJWT(tokenString string) (*jwt.Token, error) {
-	secret := os.Getenv("JWT_SECRET")
+	secret := readSecret("JWT_SECRET")
 	return jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
@@ -207,4 +219,14 @@ func getQueryID(r *http.Request) (int, error) {
 	}
 
 	return id, nil
+}
+
+func readSecret(key string) string {
+	err := godotenv.Load(".env")
+
+	if err != nil {
+		log.Fatalf("env err")
+	}
+
+	return os.Getenv(key)
 }
