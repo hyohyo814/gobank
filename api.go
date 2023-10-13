@@ -96,7 +96,7 @@ func (s *APIServer) handleCreateAccount(w http.ResponseWriter, r *http.Request) 
 
 	tokenString, err := createJWT(account)
 	if err != nil {
-		return err 
+		return err
 	}
 
 	fmt.Println("JWT token: ", tokenString)
@@ -135,6 +135,11 @@ func WriteJSON(w http.ResponseWriter, status int, v any) error {
 	return json.NewEncoder(w).Encode(v)
 }
 
+func permDen(w http.ResponseWriter) {
+	WriteJSON(w, http.StatusForbidden, APIError{Error: "permission denied"})
+}
+
+// tokens
 func createJWT(acc *Account) (string, error) {
 	claims := &jwt.MapClaims{
 		"expiresAt":     15000,
@@ -147,9 +152,6 @@ func createJWT(acc *Account) (string, error) {
 	return token.SignedString([]byte(secret))
 }
 
-func permDen(w http.ResponseWriter) {
-	WriteJSON(w, http.StatusForbidden, APIError{Error: "permission denied"})
-}
 
 func withJWTAuth(handlerFunc http.HandlerFunc, s Storage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -202,6 +204,7 @@ type APIError struct {
 	Error string `json:"error"`
 }
 
+// miscellaneous
 func makeHTTPHandleFunc(f apiFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if err := f(w, r); err != nil {
